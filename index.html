@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>אלופי הכפל - משחק תחרותי</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Assistant', sans-serif;
+      background-color: #ffffff;
+      color: #0f172a;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .shape-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+    .shape-diamond { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+    .shape-circle { border-radius: 50%; }
+    .shape-square { border-radius: 1rem; }
+    @keyframes pulse-fast {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+    .animate-pulse-fast { animation: pulse-fast 1.2s infinite; }
+  </style>
+</head>
+<body id="main-body" class="bg-white text-slate-900 flex flex-col items-center justify-start p-2 sm:p-6 min-h-screen">
+
+  <!-- ================= HOST CONTROL MODAL / POPUP ================= -->
+  <div id="host-modal-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-3">
+    <div id="host-modal-card" class="bg-white text-slate-900 rounded-3xl p-4 sm:p-6 max-w-sm w-full shadow-2xl border-2 border-slate-900 space-y-4 animate-pulse-fast relative max-h-[90vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between border-b-2 border-slate-200 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl sm:text-2xl">⚙️</span>
+          <h3 class="font-black text-base sm:text-lg text-indigo-700">בקרת מפעיל</h3>
+        </div>
+        <button type="button" onclick="toggleHostWidget()" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 font-black flex items-center justify-center text-slate-900 transition">✕</button>
+      </div>
+
+      <div class="space-y-3 text-sm">
+        <div>
+          <label class="font-bold flex justify-between mb-1 text-xs sm:text-sm">
+            <span>זמן לשאלה:</span>
+            <span id="widget-time-val" class="text-indigo-700 font-black">15 שניות</span>
+          </label>
+          <input type="range" id="widget-timer-range" min="1" max="100" value="15" oninput="updateTimerFromWidget(this.value)" class="w-full accent-indigo-600 cursor-pointer">
+        </div>
+
+        <div>
+          <label class="font-bold flex justify-between mb-1 text-xs sm:text-sm">
+            <span>שאלות בסבב:</span>
+            <span id="widget-rounds-val" class="text-indigo-700 font-black">10</span>
+          </label>
+          <input type="range" id="widget-rounds-range" min="2" max="20" value="10" oninput="updateRoundsFromWidget(this.value)" class="w-full accent-indigo-600 cursor-pointer">
+        </div>
+
+        <div class="flex gap-2 pt-1">
+          <button type="button" onclick="toggleTheme()" id="widget-theme-btn" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 border-2 border-slate-300 font-extrabold py-2.5 px-3 rounded-xl transition text-center flex items-center justify-center gap-1.5 shadow-sm text-xs sm:text-sm">
+            <span id="widget-theme-emoji">☀️</span> ערכת נושא
+          </button>
+          <button type="button" onclick="togglePauseGame()" id="widget-pause-btn" class="flex-1 bg-amber-300 hover:bg-amber-400 text-slate-950 border-2 border-amber-500 font-extrabold py-2.5 px-3 rounded-xl transition shadow-sm text-xs sm:text-sm">
+            ⏸️ השהה
+          </button>
+        </div>
+
+        <div id="widget-game-status" class="text-center font-bold text-xs text-slate-600 pt-2 border-t-2 border-slate-200">
+          מצב: בלובי הגדרות
+        </div>
+      </div>
+
+      <button type="button" onclick="toggleHostWidget()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-lg transition text-sm">
+        סגור חלון בקרה
+      </button>
+    </div>
+  </div>
+
+  <!-- FLOATING HOST BUTTON -->
+  <button type="button" onclick="toggleHostWidget()" class="fixed top-3 left-3 z-40 bg-slate-900 hover:bg-slate-800 text-white border-2 border-slate-700 px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl shadow-xl transition flex items-center gap-1.5 font-extrabold text-xs sm:text-sm">
+    <span>⚙️</span> בקרת מפעיל
+  </button>
+
+  <!-- ================= MAIN CONTAINER ================= -->
+  <div id="main-container" class="w-full max-w-2xl bg-white text-slate-900 rounded-3xl shadow-xl p-4 sm:p-8 mt-14 sm:mt-6 border-2 border-slate-200 transition-colors duration-300">
+    <!-- TOP HEADER BAR -->
+    <div class="flex items-center justify-between border-b-2 border-slate-200 pb-3 mb-5">
+      <div class="flex items-center gap-2.5">
+        <span class="text-2xl sm:text-3xl">🏆</span>
+        <div>
+          <h1 class="text-lg sm:text-2xl font-black text-slate-900 leading-tight" id="app-title">אלופי הכפל</h1>
+          <span class="text-xs font-bold text-indigo-700">זירת תרגול תחרותית</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="toggleSound()" id="sound-btn" class="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-900 border-2 border-slate-300 rounded-xl transition text-base sm:text-lg shadow-xs" title="הדלק/כבה צלילים">
+          <span id="sound-icon">🔊</span>
+        </button>
+        <button type="button" onclick="toggleTheme()" id="theme-btn" class="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-900 border-2 border-slate-300 rounded-xl transition text-base sm:text-lg shadow-xs" title="החלף ערכת נושא יום/לילה">
+          <span id="theme-icon">☀️</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= VIEW 1: LOBBY / SETTINGS ================= -->
+    <div id="view-lobby" class="space-y-4 sm:space-y-6">
+      <div class="text-center space-y-1">
+        <h2 class="text-lg sm:text-xl font-black">ברוכים הבאים לזירת התחרות!</h2>
+        <p class="text-xs sm:text-sm font-semibold text-slate-600" id="lobby-subtitle">הגדירו את מאפייני הסבב, בחרו את השחקן שלכם והתחילו להתחרות</p>
+      </div>
+
+      <!-- PLAYER PROFILE CONFIG -->
+      <div class="ui-card bg-slate-50 p-3.5 sm:p-4 rounded-2xl border-2 border-slate-300 space-y-3 shadow-xs">
+        <h3 class="font-black text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">👤 פרטי השחקן שלך</h3>
+        <div class="flex flex-col sm:flex-row gap-3 items-center">
+          <input type="text" id="player-name-input" value="אלוף הכפל" placeholder="הכנס את שמך..." class="ui-input w-full sm:flex-1 px-3.5 py-2.5 rounded-xl border-2 border-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 font-extrabold bg-white text-slate-950 placeholder-slate-400 text-sm shadow-xs">
+          <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-center">
+            <span class="text-xs font-extrabold text-slate-700">אוואטר:</span>
+            <div id="avatar-selector" class="flex gap-1 overflow-x-auto py-1 max-w-full">
+              <!-- Generated by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GAME SETTINGS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        <!-- Range Settings -->
+        <div class="ui-card bg-slate-50 p-3.5 sm:p-4 rounded-2xl border-2 border-slate-300 space-y-3 shadow-xs">
+          <h3 class="font-black text-xs sm:text-sm text-slate-900">📐 טווח כפולות בסבב</h3>
+          <div class="flex items-center justify-between text-xs font-bold text-slate-800">
+            <span>התחלה (1-9): <b id="lbl-min" class="text-indigo-700 font-black text-sm">1</b></span>
+            <input type="range" id="range-min" min="1" max="9" value="1" oninput="updateRanges()" class="w-28 sm:w-32 accent-indigo-600 cursor-pointer">
+          </div>
+          <div class="flex items-center justify-between text-xs font-bold text-slate-800">
+            <span>סיום (2-10): <b id="lbl-max" class="text-indigo-700 font-black text-sm">10</b></span>
+            <input type="range" id="range-max" min="2" max="10" value="10" oninput="updateRanges()" class="w-28 sm:w-32 accent-indigo-600 cursor-pointer">
+          </div>
+        </div>
+
+        <!-- Question Type & Timer & Questions Count -->
+        <div class="ui-card bg-slate-50 p-3.5 sm:p-4 rounded-2xl border-2 border-slate-300 space-y-3 shadow-xs">
+          <h3 class="font-black text-xs sm:text-sm text-slate-900">⚙️ הגדרות נוספות</h3>
+          <div>
+            <label class="text-xs font-bold text-slate-800 block mb-1">סוג שאלות:</label>
+            <select id="question-mode" class="ui-input w-full p-2.5 rounded-xl border-2 border-slate-400 focus:border-indigo-600 text-xs font-extrabold bg-white text-slate-950 focus:outline-none">
+              <option value="mixed">משולב (50% תרגיל / 50% תוצאה)</option>
+              <option value="exercise">תרגיל בלבד (כמה זה 4×5?)</option>
+              <option value="answer">תוצאה בלבד (איזה תרגיל שווה 20?)</option>
+            </select>
+          </div>
+          <div class="flex gap-2.5">
+            <div class="flex-1">
+              <label class="text-xs font-bold text-slate-800 block mb-1">זמן (שניות):</label>
+              <input type="number" id="input-timer" min="1" max="100" value="15" onchange="syncTimerInput(this.value)" class="ui-input w-full p-2 rounded-xl border-2 border-slate-400 focus:border-indigo-600 text-sm font-black bg-white text-slate-950 text-center focus:outline-none">
+            </div>
+            <div class="flex-1">
+              <label class="text-xs font-bold text-slate-800 block mb-1">שאלות בסבב:</label>
+              <input type="number" id="input-rounds" min="2" max="20" value="10" onchange="syncRoundsInput(this.value)" class="ui-input w-full p-2 rounded-xl border-2 border-slate-400 focus:border-indigo-600 text-sm font-black bg-white text-slate-950 text-center focus:outline-none">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- START GAME BUTTON -->
+      <button type="button" onclick="startGame()" class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white border-b-4 border-emerald-800 font-black text-base sm:text-lg rounded-2xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2">
+        <span>🚀 התחל משחק תחרותי</span>
+      </button>
+
+      <!-- MULTIPLAYER INFO BOX -->
+      <div class="ui-info-box bg-slate-50 border-2 border-slate-300 rounded-2xl p-3.5 sm:p-4 space-y-1.5">
+        <h3 class="font-black text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">🌐 האם אפשר לשחק מול חבר דרך שיתוף לינק?</h3>
+        <p class="text-xs font-semibold text-slate-700 leading-relaxed">
+          כרגע גרסת הדמו מתחרה מול מתחרים חכמים מובנים כדי שתוכל לשחק ולתרגל לבד מכל מכשיר. כדי ששליחת לינק לחבר תפתח חדר משותף אמיתי בזמן אמת, נדרש לחבר את המשחק לשרת ענן שיסנכרן את השאלות והניקוד בין הטלפונים!
+        </p>
+      </div>
+
+      <!-- MOBILE PWA / APP INSTALL GUIDE -->
+      <div class="ui-info-box bg-slate-50 border-2 border-slate-300 rounded-2xl p-3.5 sm:p-4 space-y-2.5">
+        <h3 class="font-black text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">📱 התקנת האפליקציה במסך הבית (נייד וטאבלט)</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+          <div class="ui-subcard bg-white p-2.5 rounded-xl border-2 border-slate-200 flex items-start gap-2">
+            <span class="text-xl">🍏</span>
+            <div class="text-slate-800">
+              <strong class="font-black block mb-0.5">אייפון (Safari):</strong>
+              <span>לחץ על <b>השתף ⎋</b> ובחר <b>"הוסף למסך הבית" ➕</b>.</span>
+            </div>
+          </div>
+          <div class="ui-subcard bg-white p-2.5 rounded-xl border-2 border-slate-200 flex items-start gap-2">
+            <span class="text-xl">🤖</span>
+            <div class="text-slate-800">
+              <strong class="font-black block mb-0.5">אנדרואיד (Chrome):</strong>
+              <span>לחץ על <b>3 הנקודות ⋮</b> ובחר <b>"התקן אפליקציה"</b>.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ================= VIEW 2: GAMEPLAY ARENA ================= -->
+    <div id="view-game" class="hidden space-y-3 sm:space-y-4">
+      
+      <!-- GAME HEADER STATS -->
+      <div id="game-stats-bar" class="flex items-center justify-between bg-slate-100 border-2 border-slate-300 px-3 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold text-slate-900 transition-colors">
+        <div class="flex items-center gap-1.5">
+          <span id="game-player-avatar" class="text-lg sm:text-xl">🦁</span>
+          <span id="game-player-name" class="truncate max-w-[90px] sm:max-w-none">שחקן</span>
+        </div>
+        <div id="game-q-badge" class="bg-white border border-slate-300 px-2.5 py-1 rounded-xl shadow-xs transition-colors">
+          שאלה <span id="current-q-num" class="text-indigo-700 font-black">1</span>/<span id="total-q-num" class="text-indigo-700 font-black">10</span>
+        </div>
+        <div class="bg-indigo-700 text-white px-3 py-1 rounded-xl shadow-sm font-black">
+          ניקוד: <span id="current-score">0</span>
+        </div>
+      </div>
+
+      <!-- TIMER BAR -->
+      <div class="w-full bg-slate-200 border border-slate-300 h-3 rounded-full overflow-hidden">
+        <div id="timer-bar" class="bg-emerald-600 h-full w-full transition-all duration-300 linear"></div>
+      </div>
+      <div class="text-center font-extrabold text-xs sm:text-sm text-slate-700" id="timer-text">
+        נותרו 15 שניות
+      </div>
+
+      <!-- QUESTION DISPLAY CARD -->
+      <div class="bg-indigo-700 border-2 border-indigo-900 rounded-3xl p-5 sm:p-6 text-center text-white shadow-xl space-y-1 sm:space-y-2 relative overflow-hidden">
+        <div class="absolute -right-6 -bottom-6 text-white/10 text-8xl sm:text-9xl font-black select-none">✖</div>
+        <span class="text-[11px] sm:text-xs uppercase font-black tracking-wider bg-indigo-900/70 border border-white/30 px-3.5 py-1 rounded-full inline-block" id="question-type-badge">
+          תרגיל כפל
+        </span>
+        <div class="text-3xl sm:text-5xl font-black tracking-wide py-2 sm:py-4 drop-shadow-sm" id="question-text" dir="ltr">
+          7 × 8 = ?
+        </div>
+      </div>
+
+      <!-- 4 KAHOOT-STYLE ANSWER BUTTONS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-1">
+        <button type="button" onclick="handleAnswer(0)" id="ans-btn-0" class="ans-btn p-4 rounded-2xl font-black text-lg sm:text-xl text-white shadow-md bg-rose-600 hover:bg-rose-700 border-b-4 border-rose-800 transition transform active:scale-95 flex items-center gap-3 text-right disabled:cursor-not-allowed">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 bg-black/20 flex items-center justify-center shape-triangle text-xl sm:text-2xl flex-shrink-0">▲</div>
+          <span id="ans-text-0" class="flex-1" dir="ltr">56</span>
+        </button>
+
+        <button type="button" onclick="handleAnswer(1)" id="ans-btn-1" class="ans-btn p-4 rounded-2xl font-black text-lg sm:text-xl text-white shadow-md bg-blue-600 hover:bg-blue-700 border-b-4 border-blue-800 transition transform active:scale-95 flex items-center gap-3 text-right disabled:cursor-not-allowed">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 bg-black/20 flex items-center justify-center shape-diamond text-xl sm:text-2xl flex-shrink-0">◆</div>
+          <span id="ans-text-1" class="flex-1" dir="ltr">48</span>
+        </button>
+
+        <button type="button" onclick="handleAnswer(2)" id="ans-btn-2" class="ans-btn p-4 rounded-2xl font-black text-lg sm:text-xl text-slate-950 shadow-md bg-amber-400 hover:bg-amber-500 border-b-4 border-amber-600 transition transform active:scale-95 flex items-center gap-3 text-right disabled:cursor-not-allowed">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 bg-black/15 flex items-center justify-center shape-circle text-xl sm:text-2xl flex-shrink-0">●</div>
+          <span id="ans-text-2" class="flex-1" dir="ltr">64</span>
+        </button>
+
+        <button type="button" onclick="handleAnswer(3)" id="ans-btn-3" class="ans-btn p-4 rounded-2xl font-black text-lg sm:text-xl text-white shadow-md bg-emerald-600 hover:bg-emerald-700 border-b-4 border-emerald-800 transition transform active:scale-95 flex items-center gap-3 text-right disabled:cursor-not-allowed">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 bg-black/20 flex items-center justify-center shape-square text-xl sm:text-2xl flex-shrink-0">■</div>
+          <span id="ans-text-3" class="flex-1" dir="ltr">42</span>
+        </button>
+      </div>
+
+      <!-- LIVE OPPONENTS TICKER -->
+      <div class="ui-card bg-slate-50 border-2 border-slate-300 rounded-2xl p-3">
+        <h4 class="text-xs font-black text-slate-700 mb-2">מתחרים בזירה:</h4>
+        <div id="opponents-list" class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ================= VIEW 3: PODIUM / RESULTS ================= -->
+    <div id="view-podium" class="hidden space-y-4 sm:space-y-6 text-center py-4">
+      <div class="space-y-2">
+        <span class="text-4xl sm:text-5xl">🏆</span>
+        <h2 class="text-2xl sm:text-3xl font-black text-slate-900" id="podium-title">
+          המשחק הסתיים!
+        </h2>
+        <p class="text-xs sm:text-sm font-bold text-slate-600">כל הכבוד לכל המשתתפים באלופי הכפל!</p>
+      </div>
+
+      <div id="podium-list" class="space-y-2.5 max-w-md mx-auto text-xs sm:text-sm">
+        <!-- Populated by JS -->
+      </div>
+
+      <button type="button" onclick="returnToLobby()" class="w-full py-3.5 bg-indigo-700 hover:bg-indigo-800 text-white border-b-4 border-indigo-900 font-black rounded-2xl shadow-lg transition text-sm sm:text-base">
+        🔄 חזור למסך הראשי
+      </button>
+    </div>
+
+  </div>
+
+  <!-- CUSTOM MESSAGE MODAL -->
+  <div id="custom-modal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div id="custom-modal-card" class="bg-white text-slate-900 rounded-3xl p-5 sm:p-6 max-w-sm w-full text-center space-y-3 sm:space-y-4 shadow-2xl animate-pulse-fast border-2 border-slate-900">
+      <div id="modal-icon" class="text-3xl sm:text-4xl">🎉</div>
+      <h3 id="modal-title" class="text-lg sm:text-xl font-black">כותרת</h3>
+      <p id="modal-desc" class="text-xs sm:text-sm font-bold text-slate-700">הודעה</p>
+      <button type="button" onclick="closeModal()" class="w-full py-3 bg-indigo-700 hover:bg-indigo-800 text-white font-black rounded-xl text-sm">המשך לשאלה הבאה</button>
+    </div>
+  </div>
+
+  <!-- ================= JAVASCRIPT LOGIC ================= -->
+  <script>
+    // מנוע צלילים מובנה באמצעות Web Audio API ללא תלות בקבצים חיצוניים
+    const SFX = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+      },
+      playTone(freq, type, duration) {
+        if (!state.soundEnabled) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {
+          console.error('Audio playback error:', e);
+        }
+      },
+      click() { this.playTone(600, 'sine', 0.08); },
+      correct() {
+        this.playTone(523.25, 'triangle', 0.12);
+        setTimeout(() => this.playTone(659.25, 'triangle', 0.15), 100);
+        setTimeout(() => this.playTone(783.99, 'triangle', 0.25), 200);
+      },
+      wrong() {
+        this.playTone(220, 'sawtooth', 0.2);
+        setTimeout(() => this.playTone(185, 'sawtooth', 0.3), 150);
+      },
+      win() {
+        [523, 587, 659, 698, 783, 880].forEach((f, i) => {
+          setTimeout(() => this.playTone(f, 'sine', 0.2), i * 120);
+        });
+      }
+    };
+
+    const AVATARS = ['🦁', '🚀', '🦄', '🦊', '🐼', '🐯', '🤖', '🐬', '🦉', '🦖'];
+
+    // מצב האפליקציה המרכזי
+    const state = {
+      darkMode: false,
+      soundEnabled: true,
+      widgetOpen: false,
+      playerName: 'אלוף הכפל',
+      playerAvatar: '🦁',
+      minMult: 1,
+      maxMult: 10,
+      questionMode: 'mixed',
+      timerSeconds: 15,
+      totalRounds: 10,
+      currentQuestionIndex: 0,
+      score: 0,
+      deck: [],
+      currentQ: null,
+      timerInterval: null,
+      timeLeft: 15,
+      isPaused: false,
+      questionAnswered: false,
+      opponents: [
+        { name: 'נועה', score: 0, avatar: '🚀', skill: 0.85 },
+        { name: 'איתי', score: 0, avatar: '🦁', skill: 0.72 },
+        { name: 'מאיה', score: 0, avatar: '🦄', skill: 0.65 }
+      ]
+    };
+
+    window.onload = function() {
+      buildAvatarSelector();
+      updateRanges();
+    };
+
+    // בניית בורר האוואטרים בלובי
+    function buildAvatarSelector() {
+      const container = document.getElementById('avatar-selector');
+      container.innerHTML = AVATARS.map(av => `
+        <button type="button" onclick="selectAvatar('${av}')" class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg transition border-2 ${state.playerAvatar === av ? 'bg-indigo-700 text-white border-indigo-900 shadow-md scale-105' : (state.darkMode ? 'bg-slate-800 border-slate-600 hover:bg-slate-700' : 'bg-white border-slate-300 hover:bg-slate-200')}">
+          ${av}
+        </button>
+      `).join('');
+    }
+
+    function selectAvatar(av) {
+      state.playerAvatar = av;
+      SFX.click();
+      buildAvatarSelector();
+    }
+
+    // עדכון טווחי הכפולות בלובי
+    function updateRanges() {
+      const min = parseInt(document.getElementById('range-min').value, 10);
+      const max = parseInt(document.getElementById('range-max').value, 10);
+      if (min > max) {
+        document.getElementById('range-min').value = max;
+        state.minMult = max;
+      } else {
+        state.minMult = min;
+      }
+      state.maxMult = max;
+      document.getElementById('lbl-min').textContent = state.minMult;
+      document.getElementById('lbl-max').textContent = state.maxMult;
+    }
+
+    function syncTimerInput(val) {
+      let v = Math.max(1, Math.min(100, parseInt(val, 10) || 15));
+      state.timerSeconds = v;
+      document.getElementById('input-timer').value = v;
+      document.getElementById('widget-timer-range').value = v;
+      document.getElementById('widget-time-val').textContent = v + ' שניות';
+    }
+
+    function syncRoundsInput(val) {
+      let v = Math.max(2, Math.min(20, parseInt(val, 10) || 10));
+      state.totalRounds = v;
+      document.getElementById('input-rounds').value = v;
+      document.getElementById('widget-rounds-range').value = v;
+      document.getElementById('widget-rounds-val').textContent = v;
+    }
+
+    function updateTimerFromWidget(val) {
+      state.timerSeconds = parseInt(val, 10);
+      document.getElementById('input-timer').value = val;
+      document.getElementById('widget-time-val').textContent = val + ' שניות';
+    }
+
+    function updateRoundsFromWidget(val) {
+      state.totalRounds = parseInt(val, 10);
+      document.getElementById('input-rounds').value = val;
+      document.getElementById('widget-rounds-val').textContent = val;
+    }
+
+    function toggleHostWidget() {
+      state.widgetOpen = !state.widgetOpen;
+      const modal = document.getElementById('host-modal-backdrop');
+      if (state.widgetOpen) {
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    // השהיה והמשך של המשחק מתוך בקרת המפעיל
+    function togglePauseGame() {
+      SFX.click();
+      state.isPaused = !state.isPaused;
+      const pauseBtn = document.getElementById('widget-pause-btn');
+      const statusEl = document.getElementById('widget-game-status');
+      const isPlaying = !document.getElementById('view-game').classList.contains('hidden');
+
+      if (state.isPaused) {
+        pauseBtn.innerHTML = '▶️ המשך';
+        pauseBtn.classList.remove('bg-amber-300', 'hover:bg-amber-400', 'border-amber-500');
+        pauseBtn.classList.add('bg-emerald-400', 'hover:bg-emerald-500', 'border-emerald-600');
+        if (isPlaying) {
+          statusEl.textContent = 'מצב: המשחק מושהה ⏸️';
+          document.getElementById('timer-text').textContent = `מושהה (${state.timeLeft} שניות נותרו)`;
+        }
+      } else {
+        pauseBtn.innerHTML = '⏸️ השהה';
+        pauseBtn.classList.remove('bg-emerald-400', 'hover:bg-emerald-500', 'border-emerald-600');
+        pauseBtn.classList.add('bg-amber-300', 'hover:bg-amber-400', 'border-amber-500');
+        if (isPlaying) {
+          statusEl.textContent = `מצב: במשחק (שאלה ${state.currentQuestionIndex + 1}/${state.totalRounds})`;
+          updateTimerUI();
+        }
+      }
+    }
+
+    function toggleSound() {
+      state.soundEnabled = !state.soundEnabled;
+      const iconEl = document.getElementById('sound-icon');
+      if (iconEl) iconEl.textContent = state.soundEnabled ? '🔊' : '🔇';
+      if (state.soundEnabled) SFX.click();
+    }
+
+    // החלפת ערכת נושא יום / לילה
+    function toggleTheme() {
+      state.darkMode = !state.darkMode;
+      SFX.click();
+      const bodyEl = document.body;
+      const mainContainer = document.getElementById('main-container');
+      const hostCard = document.getElementById('host-modal-card');
+      const customCard = document.getElementById('custom-modal-card');
+      const themeIcon = document.getElementById('theme-icon');
+      const widgetEmoji = document.getElementById('widget-theme-emoji');
+      const gameStatsBar = document.getElementById('game-stats-bar');
+      const gameQBadge = document.getElementById('game-q-badge');
+      const timerText = document.getElementById('timer-text');
+
+      const uiCards = document.querySelectorAll('.ui-card, .ui-info-box');
+      const uiSubcards = document.querySelectorAll('.ui-subcard');
+      const uiInputs = document.querySelectorAll('.ui-input');
+
+      if (state.darkMode) {
+        bodyEl.style.backgroundColor = '#09090b';
+        bodyEl.style.color = '#f8fafc';
+        mainContainer.className = 'w-full max-w-2xl bg-slate-900 text-slate-100 rounded-3xl shadow-2xl p-4 sm:p-8 mt-14 sm:mt-6 border-2 border-slate-700 transition-colors duration-300';
+        hostCard.className = 'bg-slate-900 text-slate-100 rounded-3xl p-4 sm:p-6 max-w-sm w-full shadow-2xl border-2 border-slate-600 space-y-4 animate-pulse-fast relative max-h-[90vh] overflow-y-auto';
+        customCard.className = 'bg-slate-900 text-slate-100 rounded-3xl p-5 sm:p-6 max-w-sm w-full text-center space-y-3 sm:space-y-4 shadow-2xl animate-pulse-fast border-2 border-slate-600';
+        
+        if (gameStatsBar) {
+          gameStatsBar.classList.remove('bg-slate-100', 'border-slate-300', 'text-slate-900');
+          gameStatsBar.classList.add('bg-slate-800', 'border-slate-600', 'text-slate-100');
+        }
+        if (gameQBadge) {
+          gameQBadge.classList.remove('bg-white', 'border-slate-300');
+          gameQBadge.classList.add('bg-slate-900', 'border-slate-600');
+        }
+        if (timerText) {
+          timerText.classList.replace('text-slate-700', 'text-slate-300');
+        }
+
+        uiCards.forEach(el => {
+          el.classList.remove('bg-slate-50', 'border-slate-300');
+          el.classList.add('bg-slate-800', 'border-slate-600', 'text-slate-100');
+        });
+        uiSubcards.forEach(el => {
+          el.classList.remove('bg-white', 'border-slate-200');
+          el.classList.add('bg-slate-900', 'border-slate-700', 'text-slate-100');
+        });
+        uiInputs.forEach(el => {
+          el.classList.remove('bg-white', 'text-slate-950', 'border-slate-400');
+          el.classList.add('bg-slate-950', 'text-white', 'border-slate-500');
+        });
+
+        document.getElementById('app-title').classList.replace('text-slate-900', 'text-white');
+        document.getElementById('podium-title').classList.replace('text-slate-900', 'text-white');
+        if (themeIcon) themeIcon.textContent = '🌙';
+        if (widgetEmoji) widgetEmoji.textContent = '🌙';
+      } else {
+        bodyEl.style.backgroundColor = '#ffffff';
+        bodyEl.style.color = '#0f172a';
+        mainContainer.className = 'w-full max-w-2xl bg-white text-slate-900 rounded-3xl shadow-xl p-4 sm:p-8 mt-14 sm:mt-6 border-2 border-slate-200 transition-colors duration-300';
+        hostCard.className = 'bg-white text-slate-900 rounded-3xl p-4 sm:p-6 max-w-sm w-full shadow-2xl border-2 border-slate-900 space-y-4 animate-pulse-fast relative max-h-[90vh] overflow-y-auto';
+        customCard.className = 'bg-white text-slate-900 rounded-3xl p-5 sm:p-6 max-w-sm w-full text-center space-y-3 sm:space-y-4 shadow-2xl animate-pulse-fast border-2 border-slate-900';
+
+        if (gameStatsBar) {
+          gameStatsBar.classList.remove('bg-slate-800', 'border-slate-600', 'text-slate-100');
+          gameStatsBar.classList.add('bg-slate-100', 'border-slate-300', 'text-slate-900');
+        }
+        if (gameQBadge) {
+          gameQBadge.classList.remove('bg-slate-900', 'border-slate-600');
+          gameQBadge.classList.add('bg-white', 'border-slate-300');
+        }
+        if (timerText) {
+          timerText.classList.replace('text-slate-300', 'text-slate-700');
+        }
+
+        uiCards.forEach(el => {
+          el.classList.remove('bg-slate-800', 'border-slate-600', 'text-slate-100');
+          el.classList.add('bg-slate-50', 'border-slate-300');
+        });
+        uiSubcards.forEach(el => {
+          el.classList.remove('bg-slate-900', 'border-slate-700', 'text-slate-100');
+          el.classList.add('bg-white', 'border-slate-200');
+        });
+        uiInputs.forEach(el => {
+          el.classList.remove('bg-slate-950', 'text-white', 'border-slate-500');
+          el.classList.add('bg-white', 'text-slate-950', 'border-slate-400');
+        });
+
+        document.getElementById('app-title').classList.replace('text-white', 'text-slate-900');
+        document.getElementById('podium-title').classList.replace('text-white', 'text-slate-900');
+        if (themeIcon) themeIcon.textContent = '☀️';
+        if (widgetEmoji) widgetEmoji.textContent = '☀️';
+      }
+      buildAvatarSelector();
+      updateOpponentsUI();
+    }
+
+    // ================= לוגיקת המשחק המלאה =================
+
+    // ערבוב Fisher-Yates
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function randInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    // התחלת סבב משחק חדש
+    function startGame() {
+      SFX.click();
+      const nameInput = document.getElementById('player-name-input').value.trim();
+      state.playerName = nameInput || 'אלוף הכפל';
+      state.questionMode = document.getElementById('question-mode').value;
+      updateRanges();
+      syncTimerInput(document.getElementById('input-timer').value);
+      syncRoundsInput(document.getElementById('input-rounds').value);
+
+      state.currentQuestionIndex = 0;
+      state.score = 0;
+      state.isPaused = false;
+      state.questionAnswered = false;
+
+      // איפוס כפתור השהיה בבקרת המפעיל
+      const pauseBtn = document.getElementById('widget-pause-btn');
+      pauseBtn.innerHTML = '⏸️ השהה';
+      pauseBtn.classList.remove('bg-emerald-400', 'hover:bg-emerald-500', 'border-emerald-600');
+      pauseBtn.classList.add('bg-amber-300', 'hover:bg-amber-400', 'border-amber-500');
+
+      // איפוס ניקוד המתחרים
+      state.opponents.forEach(op => {
+        op.score = 0;
+      });
+
+      // בניית חפיסת השאלות
+      state.deck = generateDeck();
+
+      // עדכון ממשק הזירה
+      document.getElementById('game-player-avatar').textContent = state.playerAvatar;
+      document.getElementById('game-player-name').textContent = state.playerName;
+      document.getElementById('total-q-num').textContent = state.totalRounds;
+      document.getElementById('current-score').textContent = '0';
+
+      document.getElementById('view-lobby').classList.add('hidden');
+      document.getElementById('view-podium').classList.add('hidden');
+      document.getElementById('view-game').classList.remove('hidden');
+
+      updateOpponentsUI();
+      loadQuestion();
+    }
+
+    // בניית חפיסת השאלות עם חלוקת 50/50 מדויקת במצב משולב וללא מסיחים כפולים
+    function generateDeck() {
+      const deck = [];
+      const usedPairs = new Set();
+
+      // קביעת סוגי השאלות לסבב
+      let questionTypes = [];
+      if (state.questionMode === 'mixed') {
+        const half = Math.floor(state.totalRounds / 2);
+        const remainder = state.totalRounds % 2;
+        const extraExercise = remainder === 1 && Math.random() < 0.5 ? 1 : 0;
+        const exerciseCount = half + extraExercise;
+        const answerCount = state.totalRounds - exerciseCount;
+
+        for (let i = 0; i < exerciseCount; i++) questionTypes.push('exercise');
+        for (let i = 0; i < answerCount; i++) questionTypes.push('answer');
+        questionTypes = shuffleArray(questionTypes);
+      } else {
+        questionTypes = Array(state.totalRounds).fill(state.questionMode);
+      }
+
+      for (let i = 0; i < state.totalRounds; i++) {
+        let a, b, pairKey;
+        let attempts = 0;
+        do {
+          a = randInt(state.minMult, state.maxMult);
+          b = randInt(1, 10);
+          if (Math.random() < 0.5) [a, b] = [b, a];
+          pairKey = `${a}x${b}`;
+          attempts++;
+        } while (usedPairs.has(pairKey) && attempts < 40);
+        usedPairs.add(pairKey);
+
+        const product = a * b;
+        const type = questionTypes[i];
+
+        if (type === 'exercise') {
+          // שאלת תרגיל: למשל "7 × 8 = ?" עם 4 תשובות מספריות ייחודיות
+          const correctStr = String(product);
+          const distractors = new Set();
+          let guard = 0;
+          while (distractors.size < 3 && guard < 100) {
+            guard++;
+            let candidate;
+            const strategy = guard % 4;
+            if (strategy === 0) {
+              candidate = a * Math.max(1, b + (Math.random() < 0.5 ? 1 : -1));
+            } else if (strategy === 1) {
+              candidate = Math.max(1, a + (Math.random() < 0.5 ? 1 : -1)) * b;
+            } else if (strategy === 2) {
+              candidate = product + randInt(-6, 6);
+            } else {
+              candidate = randInt(state.minMult, state.maxMult) * randInt(1, 10);
+            }
+            if (candidate > 0 && candidate !== product) {
+              distractors.add(String(candidate));
+            }
+          }
+          // מילוי חירום במידת הצורך
+          let fallbackVal = product + 1;
+          while (distractors.size < 3) {
+            if (fallbackVal !== product) distractors.add(String(fallbackVal));
+            fallbackVal++;
+          }
+
+          const options = shuffleArray([correctStr, ...Array.from(distractors)]);
+          const correctIndex = options.indexOf(correctStr);
+
+          deck.push({
+            type: 'exercise',
+            badge: 'תרגיל כפל',
+            prompt: `${a} × ${b} = ?`,
+            dir: 'ltr',
+            options,
+            correctIndex,
+            explanation: `${a} × ${b} = ${product}`
+          });
+        } else {
+          // שאלת תוצאה: למשל "איזה תרגיל שווה 56?" עם 4 תרגילים ייחודיים כתשובות
+          const correctStr = `${a} × ${b}`;
+          const distractors = new Set();
+          const usedProducts = new Set([product]);
+          let guard = 0;
+
+          while (distractors.size < 3 && guard < 120) {
+            guard++;
+            let da = randInt(state.minMult, state.maxMult);
+            let db = randInt(1, 10);
+            if (Math.random() < 0.5) [da, db] = [db, da];
+            const dProd = da * db;
+            const dStr = `${da} × ${db}`;
+            // מוודאים שהמסיח אינו שווה לתוצאה הנכונה (גם לא כפולה אחרת שנותנת אותה תוצאה)
+            if (!usedProducts.has(dProd) && dStr !== correctStr) {
+              usedProducts.add(dProd);
+              distractors.add(dStr);
+            }
+          }
+
+          // מילוי חירום במידת הצורך
+          let fa = 1;
+          let fb = 1;
+          while (distractors.size < 3) {
+            const fProd = fa * fb;
+            const fStr = `${fa} × ${fb}`;
+            if (fProd !== product && !distractors.has(fStr)) {
+              distractors.add(fStr);
+            }
+            fb++;
+            if (fb > 12) {
+              fb = 1;
+              fa++;
+            }
+          }
+
+          const options = shuffleArray([correctStr, ...Array.from(distractors)]);
+          const correctIndex = options.indexOf(correctStr);
+
+          deck.push({
+            type: 'answer',
+            badge: 'מצא את התרגיל',
+            prompt: `איזה תרגיל שווה ${product}?`,
+            dir: 'rtl',
+            options,
+            correctIndex,
+            explanation: `${a} × ${b} = ${product}`
+          });
+        }
+      }
+
+      return deck;
+    }
+
+    // טעינת השאלה הנוכחית למסך
+    function loadQuestion() {
+      clearInterval(state.timerInterval);
+
+      if (state.currentQuestionIndex >= state.totalRounds) {
+        endGame();
+        return;
+      }
+
+      state.questionAnswered = false;
+      state.currentQ = state.deck[state.currentQuestionIndex];
+
+      document.getElementById('current-q-num').textContent = state.currentQuestionIndex + 1;
+      document.getElementById('widget-game-status').textContent = state.isPaused
+        ? 'מצב: המשחק מושהה ⏸️'
+        : `מצב: במשחק (שאלה ${state.currentQuestionIndex + 1}/${state.totalRounds})`;
+
+      document.getElementById('question-type-badge').textContent = state.currentQ.badge;
+      const qTextEl = document.getElementById('question-text');
+      qTextEl.textContent = state.currentQ.prompt;
+      qTextEl.setAttribute('dir', state.currentQ.dir);
+
+      // איפוס עיצוב ואפשור לחיצה מחדש על 4 הכפתורים
+      const defaultBtnClasses = [
+        'ans-btn p-4 rounded-2xl font-black text-lg sm:text-xl text-white shadow-md bg-rose-600 hover:bg-rose-700 border-b-4 border-rose-800 transition transform active:scale-95 flex items-center gap-3 text-right disabled:cursor-not-allowed',
+        'ans-btn p-4 rounded-2xl font-black text-lg sm:text-xl text-white shadow-md bg-blue-600 hover:bg-blue-700 border-b-4 border-blue-800 transition transform active:scale-95 flex items-center gap-3 text-right disabled:cursor-not-allowed',
+        'ans-btn p-4 rounded-2xl font-black text-lg sm:text-xl text-slate-950 shadow-md bg-amber-400 hover:bg-amber-500 border-b-4 border-amber-600 transition transform active:scale-95 flex items-center gap-3 text-right disabled:cursor-not-allowed',
+        'ans-btn p-4 rounded-2xl font-black text-lg sm:text-xl text-white shadow-md bg-emerald-600 hover:bg-emerald-700 border-b-4 border-emerald-800 transition transform active:scale-95 flex items-center gap-3 text-right disabled:cursor-not-allowed'
+      ];
+
+      for (let i = 0; i < 4; i++) {
+        const btn = document.getElementById(`ans-btn-${i}`);
+        const txt = document.getElementById(`ans-text-${i}`);
+        btn.disabled = false;
+        btn.className = defaultBtnClasses[i];
+        txt.textContent = state.currentQ.options[i];
+      }
+
+      startTimer();
+    }
+
+    // הפעלת טיימר ספירה לאחור
+    function startTimer() {
+      clearInterval(state.timerInterval);
+      state.timeLeft = state.timerSeconds;
+      updateTimerUI();
+
+      state.timerInterval = setInterval(() => {
+        if (state.isPaused || state.questionAnswered) return;
+
+        state.timeLeft--;
+        updateTimerUI();
+
+        if (state.timeLeft <= 0) {
+          clearInterval(state.timerInterval);
+          handleTimeOut();
+        }
+      }, 1000);
+    }
+
+    // עדכון פס הזמן וטקסט השניות
+    function updateTimerUI() {
+      const bar = document.getElementById('timer-bar');
+      const text = document.getElementById('timer-text');
+      const ratio = Math.max(0, state.timeLeft / state.timerSeconds);
+      bar.style.width = `${ratio * 100}%`;
+
+      bar.classList.remove('bg-emerald-600', 'bg-amber-400', 'bg-rose-600');
+      if (ratio > 0.5) {
+        bar.classList.add('bg-emerald-600');
+      } else if (ratio > 0.25) {
+        bar.classList.add('bg-amber-400');
+      } else {
+        bar.classList.add('bg-rose-600');
+      }
+
+      if (state.isPaused) {
+        text.textContent = `מושהה (${state.timeLeft} שניות נותרו)`;
+      } else {
+        text.textContent = `נותרו ${Math.max(0, state.timeLeft)} שניות`;
+      }
+    }
+
+    // סימולציית ניקוד למתחרים בזירה בכל שאלה
+    function simulateOpponentsRound() {
+      state.opponents.forEach(op => {
+        if (Math.random() < op.skill) {
+          const speedFactor = 0.55 + Math.random() * 0.45;
+          op.score += Math.round(1000 * speedFactor);
+        }
+      });
+      updateOpponentsUI();
+    }
+
+    // נעילת כפתורים וסימון תשובה נכונה/שגויה
+    function highlightButtons(selectedIndex) {
+      const correctIdx = state.currentQ.correctIndex;
+      for (let i = 0; i < 4; i++) {
+        const btn = document.getElementById(`ans-btn-${i}`);
+        btn.disabled = true;
+        if (i === correctIdx) {
+          btn.classList.add('ring-4', 'ring-emerald-300', 'scale-[1.02]');
+        } else if (i === selectedIndex) {
+          btn.classList.add('ring-4', 'ring-rose-300', 'opacity-60');
+        } else {
+          btn.classList.add('opacity-45');
+        }
+      }
+    }
+
+    // טיפול בבחירת תשובה על ידי השחקן
+    function handleAnswer(index) {
+      if (state.questionAnswered || state.isPaused) return;
+      state.questionAnswered = true;
+      clearInterval(state.timerInterval);
+
+      const isCorrect = index === state.currentQ.correctIndex;
+      highlightButtons(index);
+      simulateOpponentsRound();
+
+      if (isCorrect) {
+        SFX.correct();
+        const timeRatio = Math.max(0.2, state.timeLeft / state.timerSeconds);
+        const earned = Math.round(500 + 500 * timeRatio);
+        state.score += earned;
+        document.getElementById('current-score').textContent = state.score;
+        showModal(
+          'תשובה נכונה! 🎉',
+          `כל הכבוד! צברת +${earned} נקודות.\n(${state.currentQ.explanation})`,
+          '✅'
+        );
+      } else {
+        SFX.wrong();
+        const correctOption = state.currentQ.options[state.currentQ.correctIndex];
+        showModal(
+          'אופס, לא הפעם 😅',
+          `התשובה הנכונה היא: ${correctOption}\n(${state.currentQ.explanation})`,
+          '❌'
+        );
+      }
+    }
+
+    // טיפול בסיום הזמן לשאלה
+    function handleTimeOut() {
+      if (state.questionAnswered) return;
+      state.questionAnswered = true;
+      SFX.wrong();
+      highlightButtons(-1);
+      simulateOpponentsRound();
+
+      const correctOption = state.currentQ.options[state.currentQ.correctIndex];
+      showModal(
+        'נגמר הזמן! ⏰',
+        `התשובה הנכונה היא: ${correctOption}\n(${state.currentQ.explanation})`,
+        '⌛'
+      );
+    }
+
+    function updateOpponentsUI() {
+      const container = document.getElementById('opponents-list');
+      if (!container) return;
+      const cardClass = state.darkMode 
+        ? 'bg-slate-900 border-slate-600 text-slate-100' 
+        : 'bg-white border-slate-300 text-slate-900';
+      const badgeClass = state.darkMode
+        ? 'bg-indigo-900 text-indigo-200'
+        : 'bg-indigo-100 text-indigo-900';
+      container.innerHTML = state.opponents.map(op => `
+        <div class="${cardClass} p-2 rounded-xl shadow-xs border-2 flex items-center justify-between">
+          <span class="font-extrabold truncate max-w-[90px] sm:max-w-none">${op.avatar} ${op.name}</span>
+          <span class="${badgeClass} px-2 py-0.5 rounded-lg font-black flex-shrink-0">${op.score}</span>
+        </div>
+      `).join('');
+    }
+
+    function showModal(title, desc, icon) {
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-desc').textContent = desc;
+      document.getElementById('modal-icon').textContent = icon;
+      document.getElementById('custom-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      SFX.click();
+      document.getElementById('custom-modal').classList.add('hidden');
+      state.currentQuestionIndex++;
+      loadQuestion();
+    }
+
+    function endGame() {
+      clearInterval(state.timerInterval);
+      SFX.win();
+
+      let allPlayers = [
+        { name: state.playerName + ' (אתה)', score: state.score, avatar: state.playerAvatar, isPlayer: true },
+        ...state.opponents
+      ];
+      allPlayers.sort((a, b) => b.score - a.score);
+
+      const podiumContainer = document.getElementById('podium-list');
+      podiumContainer.innerHTML = allPlayers.map((p, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+        const rowClass = p.isPlayer
+          ? (state.darkMode ? 'bg-indigo-950/80 border-indigo-400 font-black text-white' : 'bg-indigo-50 border-indigo-400 font-black text-slate-900')
+          : (state.darkMode ? 'bg-slate-800 border-slate-600 text-slate-100' : 'bg-slate-50 border-slate-300 text-slate-900');
+
+        return `
+          <div class="flex items-center justify-between p-3 rounded-2xl border-2 ${rowClass}">
+            <div class="flex items-center gap-2.5 truncate">
+              <span class="text-base font-black w-6 text-center">${medal}</span>
+              <span class="text-lg">${p.avatar}</span>
+              <span class="truncate">${p.name}</span>
+            </div>
+            <span class="bg-indigo-700 text-white px-2.5 py-1 rounded-xl text-xs sm:text-sm font-black flex-shrink-0">${p.score} נקודות</span>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('view-game').classList.add('hidden');
+      document.getElementById('view-podium').classList.remove('hidden');
+      document.getElementById('widget-game-status').textContent = 'מצב: הסתיים המשחק';
+    }
+
+    function returnToLobby() {
+      clearInterval(state.timerInterval);
+      SFX.click();
+      document.getElementById('view-podium').classList.add('hidden');
+      document.getElementById('view-game').classList.add('hidden');
+      document.getElementById('view-lobby').classList.remove('hidden');
+      document.getElementById('widget-game-status').textContent = 'מצב: בלובי הגדרות';
+    }
+  </script>
+
+</body>
+</html>
